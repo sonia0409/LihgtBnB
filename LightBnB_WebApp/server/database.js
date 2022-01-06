@@ -19,27 +19,27 @@ const pool = new Pool({
  * @return {Promise<{}>} A promise to the user.
  */
 
-const getUserWithEmail = function(email) {
+const getUserWithEmail = function (email) {
   const usersQuery = `
   SELECT *
   FROM users
   WHERE email = $1;`;
-  
- return  pool.query(usersQuery, [email])
-            .then(result => result.rows[0])
-            .catch(err => console.error('query error', err.stack));
+
+  return pool.query(usersQuery, [email])
+    .then(result => result.rows[0])
+    .catch(err => console.error('query error', err.stack));
 
 
- /*  let user;
-  for (const userId in users) {
-    user = users[userId];
-    if (user.email.toLowerCase() === email.toLowerCase()) {
-      break;
-    } else {
-      user = null;
-    }
-  }
-  return Promise.resolve(user); */
+  /*  let user;
+   for (const userId in users) {
+     user = users[userId];
+     if (user.email.toLowerCase() === email.toLowerCase()) {
+       break;
+     } else {
+       user = null;
+     }
+   }
+   return Promise.resolve(user); */
 }
 exports.getUserWithEmail = getUserWithEmail;
 
@@ -48,15 +48,15 @@ exports.getUserWithEmail = getUserWithEmail;
  * @param {string} id The id of the user.
  * @return {Promise<{}>} A promise to the user.
  */
-const getUserWithId = function(id) {
+const getUserWithId = function (id) {
   const usersQuery = `
   SELECT *
   FROM users
   WHERE id = $1;`;
-  
- return  pool.query(usersQuery, [id])
-            .then(result => result.rows[0])
-            .catch(err => console.error('query error', err.stack));
+
+  return pool.query(usersQuery, [id])
+    .then(result => result.rows[0])
+    .catch(err => console.error('query error', err.stack));
 }
 exports.getUserWithId = getUserWithId;
 
@@ -66,11 +66,11 @@ exports.getUserWithId = getUserWithId;
  * @param {{name: string, password: string, email: string}} user
  * @return {Promise<{}>} A promise to the user.
  */
-const addUser =  function(user) {
-  
+const addUser = function (user) {
+
   const values = [user.name, user.email, user.password]
-/* INSERT NEW USER TO USERS */
-  const insertNewUserQuery =`
+  /* INSERT NEW USER TO USERS */
+  const insertNewUserQuery = `
   INSERT INTO users
   (name, email, password)
   VALUES
@@ -78,9 +78,9 @@ const addUser =  function(user) {
   RETURNING *;`
 
   return pool
-            .query(insertNewUserQuery, values)
-            .then(result => console.log(result.rows[0]))
-            .catch(err => console.error('addUser error',err.stack))
+    .query(insertNewUserQuery, values)
+    .then(result => console.log(result.rows[0]))
+    .catch(err => console.error('addUser error', err.stack))
 
   /* const userId = Object.keys(users).length + 1;
   user.id = userId;
@@ -96,7 +96,7 @@ exports.addUser = addUser;
  * @param {string} guest_id The id of the user.
  * @return {Promise<[{}]>} A promise to the reservations.
  */
-const getAllReservations = function(guest_id, limit = 10) {
+const getAllReservations = function (guest_id, limit = 10) {
   const values = [guest_id, limit]
   const reservationsQuery = `
   SELECT reservations.*, properties.title as title, properties.number_of_bedrooms as number_of_bedrooms,
@@ -108,10 +108,10 @@ const getAllReservations = function(guest_id, limit = 10) {
   AND start_date < NOW()::DATE
   LIMIT $2;`
 
-  return pool 
-            .query(reservationsQuery, values)
-            .then(result => result.rows)
-            .catch(err => console.error("reservations error--",err.stack))
+  return pool
+    .query(reservationsQuery, values)
+    .then(result => result.rows)
+    .catch(err => console.error("reservations error--", err.stack))
 
   /* return getAllProperties(null, 2); */
 }
@@ -125,16 +125,89 @@ exports.getAllReservations = getAllReservations;
  * @param {*} limit The number of results to return.
  * @return {Promise<[{}]>}  A promise to the properties.
  */
-const getAllProperties = function(options, limit = 10) {
-  const queryProperty = `
-  SELECT *
-  FROM properties LIMIT $1;`;
 
-  return pool.query(queryProperty, [limit])
-      .then(result => result.rows)
-      .catch(err => console.error('query error', err.stack));
+
+
+
+const getAllProperties = function(options, limit = 10) {
+  console.log(options);
+  let propertyParams = [];
+  let propertyQuery = `
+  SELECT properties.*, avg(property_reviews.rating) as average_rating
+  FROM properties
+  JOIN property_reviews ON properties.id = property_id
+  `;
+
+  if(options.city) {
+    propertyParams.push(`%${options.city}%`);
+    propertyQuery += `WHERE city LIKE $${propertyParams.length} `;
+  }
+
+  if(options.owner_id) {
+    propertyParams.push(options.owner_id);
+    propertyQuery += `
+    AND owner_id = $${propertyParams.length}
+    `
+  }
+
+  if(options.minimum_price_per_night) {
+    propertyParams.push(options.minimum_price_per_night * 100)
+
+    //multiplication by 100-> convert user's input as dollars to cents
+    propertyQuery += `
+    AND properties.cost_per_night > $${propertyParams.length}
+    `;
+  }
+
+  if(options.maximum_price_per_night) {
+    propertyParams.push(options.maximum_price_per_night * 100)
+
+    //multiplication by 100-> convert user's input as dollars to cents
+    propertyQuery += `
+    AND properties.cost_per_night < $${propertyParams.length}
+    `;
+  }
+  if(options.minimum_rating){
+    propertyParams.push(options.minimum_rating)
+
+    propertyQuery += `
+    AND property_reviews.rating >= $${propertyParams.length}
+    `;
+  }
+
+
+  propertyParams.push(limit);
+  propertyQuery += `
+  GROUP BY properties.id
+  ORDER BY cost_per_night
+  LIMIT $${propertyParams.length};
+  `;
+
+  console.log(propertyQuery, propertyParams);
+
+  return pool.query(propertyQuery, propertyParams)
+    .then(result => result.rows)
+    .catch(err => console.error('query error', err.stack));
 };
 exports.getAllProperties = getAllProperties;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 /**
@@ -142,7 +215,7 @@ exports.getAllProperties = getAllProperties;
  * @param {{}} property An object containing all of the property details.
  * @return {Promise<{}>} A promise to the property.
  */
-const addProperty = function(property) {
+const addProperty = function (property) {
   const propertyId = Object.keys(properties).length + 1;
   property.id = propertyId;
   properties[propertyId] = property;
