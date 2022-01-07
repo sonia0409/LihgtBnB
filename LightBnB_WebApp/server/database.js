@@ -109,8 +109,6 @@ const getAllReservations = function (guest_id, limit = 10) {
     .query(reservationsQuery, values)
     .then(result => result.rows)
     .catch(err => console.error("reservations error--", err.stack))
-
-  /* return getAllProperties(null, 2); */
 }
 exports.getAllReservations = getAllReservations;
 
